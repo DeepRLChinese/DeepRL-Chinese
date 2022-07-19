@@ -1,4 +1,6 @@
+.vscode/
 output/
 __pycache__/
 
 *.sh
+test.py
