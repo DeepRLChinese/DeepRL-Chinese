@@ -5,6 +5,10 @@ mkdir -p output
 python 07_dqn.py --do_train --output_dir output
 ```
 
+离散环境：https://www.gymlibrary.ml/environments/classic_control/cart_pole/。
+连续环境：
+
+
 # 算法列表
 | 章节                                  | 算法                         |
 | ------------------------------------- | ---------------------------- |
