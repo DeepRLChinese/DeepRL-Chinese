@@ -5,13 +5,22 @@ mkdir -p output
 python 07_dqn.py --do_train --output_dir output
 ```
 
-离散环境：https://www.gymlibrary.ml/environments/classic_control/cart_pole/。
-连续环境：
+
+# 环境
+根据动作状态空间是否连续，我们考虑两种环境：
+- 离散环境：CartPole，https://www.gymlibrary.ml/environments/classic_control/cart_pole/。
+- 连续环境：Pendulum，https://www.gymlibrary.ml/environments/classic_control/pendulum/。
 
 
 # 算法列表
 | 章节                                  | 算法                         |
 | ------------------------------------- | ---------------------------- |
+| 1 机器学习基础                        |                              |
+| 2 蒙特卡洛                            |                              |
+| 3 强化学习基本概念                    |                              |
+| 4 动态规划                            |                              |
+| 5 无限期马尔可夫决策过程              |                              |
+| 6 强化学习基础                        |                              |
 | 7 DQN与Q学习                          | DQN                          |
 | 8 SARSA算法                           | SARSA                        |
 | 9 价值学习与高级技巧                  | Dueling DQN, Double DQN      |
@@ -21,7 +30,7 @@ python 07_dqn.py --do_train --output_dir output
 | 13 连续控制                           | DDPG, TD3                    |
 | 14 对状态的不完全观测                 |                              |
 | 15 模仿学习                           | GAIL                         |
-| 16 并行计算                           |                              |
+| 16 并行计算                           | A3C                          |
 | 17 多智能体系统                       |                              |
 | 18 合作关系设定下的多智能体强化学习   |                              |
 | 19 非合作关系设定下的多智能体强化学习 |                              |
