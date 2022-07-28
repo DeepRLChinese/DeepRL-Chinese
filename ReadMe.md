@@ -2,14 +2,14 @@
 这里是《深度强化学习》的主要算法实现。为了方便阅读，单个算法的实现及调用放在一个文件中。调用方式简单：
 ```bash
 mkdir -p output
-python 07_dqn.py --do_train --output_dir output
+python -u 07_dqn.py --do_train --output_dir output 2>&1 | tee output/log.txt
 ```
 
 
 # 环境
 根据动作状态空间是否连续，我们考虑两种环境：
-- 离散环境：CartPole，https://www.gymlibrary.ml/environments/classic_control/cart_pole/。
-- 连续环境：Pendulum，https://www.gymlibrary.ml/environments/classic_control/pendulum/。
+- 离散环境：CartPole，https://www.gymlibrary.ml/environments/classic_control/cart_pole/.
+- 连续环境：Pendulum，https://www.gymlibrary.ml/environments/classic_control/pendulum/.
 
 
 # 算法列表

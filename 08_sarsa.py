@@ -140,7 +140,7 @@ def train(args, env, agent):
                 ns = ns[index, :]
 
             # 进行多次更新。
-            for i in range(1):
+            for i in range(3):
                 loss = agent.compute_loss(args, s, a, r, ns)
                 loss.backward()
                 optimizer.step()
