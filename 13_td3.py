@@ -170,9 +170,6 @@ class INFO:
 def train(args, env, agent: TD3):
     Q1_optimizer = torch.optim.Adam(agent.Q1.parameters(), lr=args.lr)
     Q2_optimizer = torch.optim.Adam(agent.Q2.parameters(), lr=args.lr)
-
-    # q_params = itertools.chain(agent.Q1.parameters(), agent.Q2.parameters())
-    # Q_optimizer = torch.optim.Adam(q_params, lr=args.lr)
     Mu_optimizer = torch.optim.Adam(agent.Mu.parameters(), lr=args.lr)
     replay_buffer = ReplayBuffer(maxsize=100_000)
     info = INFO()
