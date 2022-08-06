@@ -25,7 +25,7 @@ python -u 07_dqn.py --do_train --output_dir output 2>&1 | tee output/log.txt
 | 8 SARSA算法                           | SARSA                        |
 | 9 价值学习与高级技巧                  | Dueling DQN, Double DQN      |
 | 10 策略梯度算法                       | REINFORCE, Actor Critic      |
-| 11 带基线的策略梯度方法               | Advantage Actor Critic (A2C) |
+| 11 带基线的策略梯度方法               | REINFORCE with baseline, A2C |
 | 12 策略学习高级技巧                   | TRPO                         |
 | 13 连续控制                           | DDPG, TD3                    |
 | 14 对状态的不完全观测                 |                              |
