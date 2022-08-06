@@ -1,8 +1,12 @@
 .vscode/
 output*/
 __pycache__/
+.ipynb_checkpoints/
 
 *.sh
+*.ipynb 
+
+
 test.py
 test.md
 
