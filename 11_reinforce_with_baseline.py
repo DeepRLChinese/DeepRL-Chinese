@@ -67,12 +67,7 @@ class REINFORCE_with_Baseline:
 
         # 目标价值。
         with torch.no_grad():
-            target_value = (
-                batch_r
-                + self.args.discount
-                * torch.logical_not(bd)
-                * self.V_target(bns).squeeze()
-            )
+            target_value = batch_r + self.args.discount * torch.logical_not(bd) * self.V_target(bns).squeeze()
 
         # 计算value loss。
         value_loss = F.mse_loss(self.V(bs).squeeze(), target_value)
@@ -90,12 +85,7 @@ class REINFORCE_with_Baseline:
 
         # 目标价值。
         with torch.no_grad():
-            target_value = (
-                batch_r
-                + self.args.discount
-                * torch.logical_not(bd)
-                * self.V_target(bns).squeeze()
-            )
+            target_value = batch_r + self.args.discount * torch.logical_not(bd) * self.V_target(bns).squeeze()
 
         # 计算policy loss。
         with torch.no_grad():
@@ -109,9 +99,7 @@ class REINFORCE_with_Baseline:
     def soft_update(self, tau=0.01):
         def soft_update_(target, source, tau_=0.01):
             for target_param, param in zip(target.parameters(), source.parameters()):
-                target_param.data.copy_(
-                    target_param.data * (1.0 - tau_) + param.data * tau_
-                )
+                target_param.data.copy_(target_param.data * (1.0 - tau_) + param.data * tau_)
 
         soft_update_(self.V_target, self.V, tau)
 
@@ -213,9 +201,7 @@ def train(args, env, agent: REINFORCE_with_Baseline):
             episode_reward = info.log["episode_reward"][-1]
             episode_length = info.log["episode_length"][-1]
             value_loss = info.log["value_loss"][-1]
-            print(
-                f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}"
-            )
+            print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}")
 
             # 重置环境。
             state = env.reset()
@@ -262,27 +248,17 @@ def eval(args, env, agent):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--env", default="CartPole-v1", type=str, help="Environment name."
-    )
+    parser.add_argument("--env", default="CartPole-v1", type=str, help="Environment name.")
     parser.add_argument("--dim_state", default=4, type=int, help="Dimension of state.")
     parser.add_argument("--num_action", default=2, type=int, help="Number of action.")
-    parser.add_argument(
-        "--output_dir", default="output", type=str, help="Output directory."
-    )
+    parser.add_argument("--output_dir", default="output", type=str, help="Output directory.")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 
-    parser.add_argument(
-        "--max_steps", default=100_000, type=int, help="Maximum steps for interaction."
-    )
-    parser.add_argument(
-        "--discount", default=0.99, type=float, help="Discount coefficient."
-    )
+    parser.add_argument("--max_steps", default=100_000, type=int, help="Maximum steps for interaction.")
+    parser.add_argument("--discount", default=0.99, type=float, help="Discount coefficient.")
     parser.add_argument("--lr", default=3e-2, type=float, help="Learning rate.")
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-    parser.add_argument(
-        "--no_cuda", action="store_true", help="Avoid using CUDA when available"
-    )
+    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
 
     parser.add_argument("--do_train", action="store_true", help="Train policy.")
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
