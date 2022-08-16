@@ -1,14 +1,13 @@
 """16.3节A3C算法实现。"""
-
-import ray
-from torch import nn
-import torch.nn.functional as F
-import torch
-import gym
-import numpy as np
-from torch.distributions import Categorical
 import argparse
 import os
+import gym
+import numpy as np
+import ray
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torch.distributions import Categorical
 
 
 class ValueNet(nn.Module):
