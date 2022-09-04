@@ -8,6 +8,7 @@ mnist_data/
 *.ipynb 
 
 
+
+tests/
 test*.py
 test.md
-

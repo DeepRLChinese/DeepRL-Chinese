@@ -70,9 +70,7 @@ class TD3:
         action = self.Mu(state)
         return action
 
-    def compute_value_loss(
-        self, args, s_batch, a_batch, r_batch, d_batch, next_s_batch
-    ):
+    def compute_value_loss(self, args, s_batch, a_batch, r_batch, d_batch, next_s_batch):
         with torch.no_grad():
             # 让目标策略网络做预测。
             a = self.target_Mu(next_s_batch)
@@ -105,9 +103,7 @@ class TD3:
     def soft_update(self, tau=0.01):
         def soft_update_(target, source, tau_=0.01):
             for target_param, param in zip(target.parameters(), source.parameters()):
-                target_param.data.copy_(
-                    target_param.data * (1.0 - tau_) + param.data * tau_
-                )
+                target_param.data.copy_(target_param.data * (1.0 - tau_) + param.data * tau_)
 
         soft_update_(self.target_Q1, self.Q1, tau)
         soft_update_(self.target_Q2, self.Q2, tau)
@@ -189,9 +185,7 @@ def train(args, env, agent: TD3):
         else:
             action = agent.get_action(torch.from_numpy(state))
             action = action.cpu().data.numpy()
-            action_noise = np.clip(
-                np.random.randn(args.dim_action), -args.max_action, args.max_action
-            )
+            action_noise = np.clip(np.random.randn(args.dim_action), -args.max_action, args.max_action)
             action = np.clip(action + action_noise, -args.max_action, args.max_action)
 
         next_state, reward, done, _ = env.step(action)
@@ -203,12 +197,8 @@ def train(args, env, agent: TD3):
             # 打印信息。
             episode_reward = info.log["episode_reward"][-1]
             episode_length = info.log["episode_length"][-1]
-            value_loss = (
-                info.log["value_loss"][-1] if len(info.log["value_loss"]) > 0 else 0
-            )
-            print(
-                f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}"
-            )
+            value_loss = info.log["value_loss"][-1] if len(info.log["value_loss"]) > 0 else 0
+            print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}")
 
             # 如果得分更高，保存模型。
             if episode_reward == info.max_episode_reward:
@@ -218,18 +208,14 @@ def train(args, env, agent: TD3):
             state = env.reset()
 
         if step > args.warmup_steps:
-            s_batch, a_batch, r_batch, d_batch, ns_batch = replay_buffer.sample(
-                n=args.batch_size
-            )
+            s_batch, a_batch, r_batch, d_batch, ns_batch = replay_buffer.sample(n=args.batch_size)
             s_batch = torch.tensor(s_batch, dtype=torch.float32)
             a_batch = torch.tensor(a_batch, dtype=torch.float32)
             r_batch = torch.tensor(r_batch, dtype=torch.float32)
             d_batch = torch.tensor(d_batch, dtype=torch.float32)
             ns_batch = torch.tensor(ns_batch, dtype=torch.float32)
 
-            value_loss1, value_loss2 = agent.compute_value_loss(
-                args, s_batch, a_batch, r_batch, d_batch, ns_batch
-            )
+            value_loss1, value_loss2 = agent.compute_value_loss(args, s_batch, a_batch, r_batch, d_batch, ns_batch)
 
             Q1_optimizer.zero_grad()
             value_loss1.backward(retain_graph=True)
@@ -260,9 +246,7 @@ def train(args, env, agent: TD3):
                 plt.close()
 
                 plt.plot(info.log["episode_reward"])
-                plt.savefig(
-                    f"{args.output_dir}/episode_reward.png", bbox_inches="tight"
-                )
+                plt.savefig(f"{args.output_dir}/episode_reward.png", bbox_inches="tight")
                 plt.close()
 
 
@@ -291,23 +275,13 @@ def eval(args, env, agent):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--env", default="Pendulum-v1", type=str, help="Environment name."
-    )
-    parser.add_argument(
-        "--dim_state", default=3, type=int, help="Dimension of observation."
-    )
+    parser.add_argument("--env", default="Pendulum-v1", type=str, help="Environment name.")
+    parser.add_argument("--dim_state", default=3, type=int, help="Dimension of observation.")
     parser.add_argument("--dim_action", default=1, type=int, help="Number of actions.")
-    parser.add_argument(
-        "--max_action", default=2.0, type=float, help="Action scale, [-max, max]."
-    )
-    parser.add_argument(
-        "--gamma", default=0.99, type=float, help="Discount coefficient."
-    )
+    parser.add_argument("--max_action", default=2.0, type=float, help="Action scale, [-max, max].")
+    parser.add_argument("--gamma", default=0.99, type=float, help="Discount coefficient.")
 
-    parser.add_argument(
-        "--max_steps", default=100_000, type=int, help="Maximum steps for interaction."
-    )
+    parser.add_argument("--max_steps", default=100_000, type=int, help="Maximum steps for interaction.")
     parser.add_argument(
         "--warmup_steps",
         default=10_000,
@@ -325,28 +299,20 @@ def main():
     parser.add_argument("--policy_noise", default=0.2, type=float, help="Policy noise.")
     parser.add_argument("--noise_clip", default=0.5, type=float, help="Policy noise.")
 
-    parser.add_argument(
-        "--no_cuda", action="store_true", help="Avoid using CUDA when available"
-    )
+    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-    parser.add_argument(
-        "--output_dir", default="output", type=str, help="Output directory."
-    )
+    parser.add_argument("--output_dir", default="output", type=str, help="Output directory.")
     parser.add_argument("--do_train", action="store_true", help="Train policy.")
     parser.add_argument("--do_eval", action="store_true", help="Evaluate policy.")
     args = parser.parse_args()
 
-    args.device = torch.device(
-        "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
-    )
+    args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     # 初始化环境。
     env = gym.make(args.env)
     env.seed(args.seed)
 
-    agent = TD3(
-        dim_state=args.dim_state, dim_action=args.dim_action, max_action=args.max_action
-    )
+    agent = TD3(dim_state=args.dim_state, dim_action=args.dim_action, max_action=args.max_action)
 
     if args.do_train:
         train(args, env, agent)

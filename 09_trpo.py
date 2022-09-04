@@ -1,8 +1,6 @@
 """参考https://github.com/ajlangley/trpo-pytorch。
 """
 import argparse
-from audioop import reverse
-from cProfile import label
 import os
 import random
 from dataclasses import dataclass, field
@@ -68,6 +66,103 @@ class ValueNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+
+class TRPO:
+    def __init__(self, args):
+        self.discount = args.discount
+        self.policy_net = PolicyNet(args.dim_obs, args.num_act)
+        self.value_net = ValueNet(args.dim_obs)
+        self.value_optimizer = torch.optim.AdamW(self.value_net.parameters(), lr=args.lr_value_net)
+
+        self.max_kl_div = 0.01
+        self.cg_max_iters = 10
+        self.line_search_accept_ratio = 0.1
+
+    def get_action(self, obs):
+        action_dist = self.policy_net(obs)
+        act = action_dist.sample()
+        return act
+
+    def surrogate_loss(self, log_action_probs, imp_sample_probs, advantages):
+        return torch.mean(torch.exp(log_action_probs - imp_sample_probs) * advantages)
+
+    def get_max_step_len(self, search_dir, Hvp_fun, max_step, retain_graph=False):
+        num = 2 * max_step
+        denom = torch.matmul(search_dir, Hvp_fun(search_dir, retain_graph))
+        max_step_len = torch.sqrt(num / denom)
+        return max_step_len
+
+    def update_policy_net(self, s_batch, a_batch, r_batch, d_batch, next_s_batch):
+        cumsum_rewards = [0]  # 加上0，方便计算。
+        for i in reversed(range(len(r_batch))):
+            cumsum_current = cumsum_rewards[-1] * self.discount * (1 - d_batch[i]) + r_batch[i]
+            cumsum_rewards.append(cumsum_current)
+        cumsum_rewards.pop(0)
+        cumsum_rewards = list(reversed(cumsum_rewards))
+        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
+
+        action_dists = self.policy_net(s_batch)
+        log_action_probs = action_dists.log_prob(a_batch)
+
+        loss = self.surrogate_loss(log_action_probs, log_action_probs.detach(), cumsum_rewards)
+        loss_grad = flat_grad(loss, self.policy_net.parameters(), retain_graph=True)
+
+        mean_kl = mean_kl_first_fixed(action_dists, action_dists)
+
+        Fvp_fun = get_Hvp_fun(mean_kl, self.policy_net.parameters())
+        search_dir = cg_solver(Fvp_fun, loss_grad, self.cg_max_iters)
+
+        expected_improvement = torch.matmul(loss_grad, search_dir)
+
+        def constraints_satisfied(step, beta):
+            apply_update(self.policy_net, step)
+
+            with torch.no_grad():
+                new_action_dists = self.policy_net(s_batch)
+                new_log_action_probs = new_action_dists.log_prob(a_batch)
+
+                new_loss = self.surrogate_loss(new_log_action_probs, log_action_probs, cumsum_rewards)
+
+                mean_kl = mean_kl_first_fixed(action_dists, new_action_dists)
+
+            actual_improvement = new_loss - loss
+            improvement_ratio = actual_improvement / (expected_improvement * beta)
+
+            apply_update(self.policy_net, -step)
+
+            surrogate_cond = improvement_ratio >= self.line_search_accept_ratio and actual_improvement > 0.0
+            kl_cond = mean_kl <= self.max_kl_div
+
+            # print(f"kl contidion = {kl_cond}, mean_kl = {mean_kl}")
+
+            return surrogate_cond and kl_cond
+
+        max_step_len = self.get_max_step_len(search_dir, Fvp_fun, self.max_kl_div, retain_graph=True)
+        step_len = line_search(search_dir, max_step_len, constraints_satisfied)
+
+        opt_step = step_len * search_dir
+        apply_update(self.policy_net, opt_step)
+
+    def update_value_net(self, args, states, r_batch, d_batch):
+        cumsum_rewards = [0]  # 加上0，方便计算。
+        for i in reversed(range(len(r_batch))):
+            cumsum_current = cumsum_rewards[-1] * self.discount * (1 - d_batch[i]) + r_batch[i]
+            cumsum_rewards.append(cumsum_current)
+        cumsum_rewards.pop(0)
+        cumsum_rewards = list(reversed(cumsum_rewards))
+        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
+
+        for i in range(args.num_update_value):
+
+            def mse():
+                self.value_optimizer.zero_grad()
+                state_values = self.value_net(states).view(-1)
+                loss = F.mse_loss(state_values, cumsum_rewards)
+                loss.backward(retain_graph=True)
+                return loss
+
+            self.value_optimizer.step(mse)
 
 
 def flat_grad(functional_output, inputs, retain_graph=False, create_graph=False):
@@ -243,103 +338,6 @@ def line_search(search_dir, max_step_len, constraints_satisfied, line_search_coe
     return torch.tensor(0.0).to(device)
 
 
-class TRPO:
-    def __init__(self, args):
-        self.discount = args.discount
-        self.policy_net = PolicyNet(args.dim_obs, args.num_act)
-        self.value_net = ValueNet(args.dim_obs)
-        self.value_optimizer = torch.optim.AdamW(self.value_net.parameters(), lr=args.lr_value_net)
-
-        self.max_kl_div = 0.01
-        self.cg_max_iters = 10
-        self.line_search_accept_ratio = 0.1
-
-    def get_action(self, obs):
-        action_dist = self.policy_net(obs)
-        act = action_dist.sample()
-        return act
-
-    def surrogate_loss(self, log_action_probs, imp_sample_probs, advantages):
-        return torch.mean(torch.exp(log_action_probs - imp_sample_probs) * advantages)
-
-    def get_max_step_len(self, search_dir, Hvp_fun, max_step, retain_graph=False):
-        num = 2 * max_step
-        denom = torch.matmul(search_dir, Hvp_fun(search_dir, retain_graph))
-        max_step_len = torch.sqrt(num / denom)
-        return max_step_len
-
-    def update_policy_net(self, s_batch, a_batch, r_batch, d_batch, next_s_batch):
-        cumsum_rewards = [0]  # 加上0，方便计算。
-        for i in reversed(range(len(r_batch))):
-            cumsum_current = cumsum_rewards[-1] * self.discount * (1 - d_batch[i]) + r_batch[i]
-            cumsum_rewards.append(cumsum_current)
-        cumsum_rewards.pop(0)
-        cumsum_rewards = list(reversed(cumsum_rewards))
-        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
-
-        action_dists = self.policy_net(s_batch)
-        log_action_probs = action_dists.log_prob(a_batch)
-
-        loss = self.surrogate_loss(log_action_probs, log_action_probs.detach(), cumsum_rewards)
-        loss_grad = flat_grad(loss, self.policy_net.parameters(), retain_graph=True)
-
-        mean_kl = mean_kl_first_fixed(action_dists, action_dists)
-
-        Fvp_fun = get_Hvp_fun(mean_kl, self.policy_net.parameters())
-        search_dir = cg_solver(Fvp_fun, loss_grad, self.cg_max_iters)
-
-        expected_improvement = torch.matmul(loss_grad, search_dir)
-
-        def constraints_satisfied(step, beta):
-            apply_update(self.policy_net, step)
-
-            with torch.no_grad():
-                new_action_dists = self.policy_net(s_batch)
-                new_log_action_probs = new_action_dists.log_prob(a_batch)
-
-                new_loss = self.surrogate_loss(new_log_action_probs, log_action_probs, cumsum_rewards)
-
-                mean_kl = mean_kl_first_fixed(action_dists, new_action_dists)
-
-            actual_improvement = new_loss - loss
-            improvement_ratio = actual_improvement / (expected_improvement * beta)
-
-            apply_update(self.policy_net, -step)
-
-            surrogate_cond = improvement_ratio >= self.line_search_accept_ratio and actual_improvement > 0.0
-            kl_cond = mean_kl <= self.max_kl_div
-
-            # print(f"kl contidion = {kl_cond}, mean_kl = {mean_kl}")
-
-            return surrogate_cond and kl_cond
-
-        max_step_len = self.get_max_step_len(search_dir, Fvp_fun, self.max_kl_div, retain_graph=True)
-        step_len = line_search(search_dir, max_step_len, constraints_satisfied)
-
-        opt_step = step_len * search_dir
-        apply_update(self.policy_net, opt_step)
-
-    def update_value_net(self, args, states, r_batch, d_batch):
-        cumsum_rewards = [0]  # 加上0，方便计算。
-        for i in reversed(range(len(r_batch))):
-            cumsum_current = cumsum_rewards[-1] * self.discount * (1 - d_batch[i]) + r_batch[i]
-            cumsum_rewards.append(cumsum_current)
-        cumsum_rewards.pop(0)
-        cumsum_rewards = list(reversed(cumsum_rewards))
-        cumsum_rewards = torch.tensor(cumsum_rewards, dtype=torch.float32)
-
-        for i in range(args.num_update_value):
-
-            def mse():
-                self.value_optimizer.zero_grad()
-                state_values = self.value_net(states).view(-1)
-                loss = F.mse_loss(state_values, cumsum_rewards)
-                loss.backward(retain_graph=True)
-                return loss
-
-            self.value_optimizer.step(mse)
-
-
 @dataclass
 class Trajectory:
     state: list = field(default_factory=list)
@@ -381,14 +379,9 @@ def train(args, env, agent):
     for i in range(args.max_steps):
         action = agent.get_action(torch.from_numpy(state)).item()
         next_state, reward, done, info = env.step(action)
-
         episode_reward += reward
         episode_length += 1
-        # 修改奖励，加速训练。
-        if done is True and episode_length < 200:
-            reward = 250 + episode_reward
-        else:
-            reward = 5 * abs(next_state[0] - state[0]) + 3 * abs(state[1])
+
         trajectory.push(state, action, reward, done, next_state)
         state = next_state
 
@@ -399,7 +392,7 @@ def train(args, env, agent):
 
             if episode_length < 150 and episode_reward > max_episode_reward:
                 save_path = os.path.join(args.output_dir, "model.bin")
-                torch.save(agent.model.state_dict(), save_path)
+                torch.save(agent.policy_net.state_dict(), save_path)
                 max_episode_reward = episode_reward
 
             episode_reward = 0
@@ -448,9 +441,9 @@ def eval(args, env, agent):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", default="MountainCar-v0", type=str, help="Environment name.")
-    parser.add_argument("--dim_obs", default=2, type=int, help="Dimension of observation.")
-    parser.add_argument("--num_act", default=3, type=int, help="Number of actions.")
+    parser.add_argument("--env", default="CartPole-v1", type=str, help="Environment name.")
+    parser.add_argument("--dim_obs", default=4, type=int, help="Dimension of observation.")
+    parser.add_argument("--num_act", default=2, type=int, help="Number of actions.")
     parser.add_argument("--discount", default=0.95, type=float, help="Discount coefficient.")
     parser.add_argument("--max_steps", default=100_000, type=int, help="Maximum steps for interaction.")
     parser.add_argument("--lr_value_net", default=1e-3, type=float, help="Learning rate of value net.")
