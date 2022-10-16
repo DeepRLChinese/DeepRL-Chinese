@@ -1,4 +1,4 @@
-"""7.3节DQN算法实现。
+"""4.3节DQN算法实现。
 """
 import argparse
 from collections import defaultdict

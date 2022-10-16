@@ -1,4 +1,4 @@
-"""16.3节A3C算法实现。"""
+"""13.3节A3C算法实现。"""
 import argparse
 import os
 import gym

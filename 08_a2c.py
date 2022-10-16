@@ -1,4 +1,4 @@
-"""11.3节A2C算法实现。"""
+"""8.3节A2C算法实现。"""
 import argparse
 import os
 from collections import defaultdict

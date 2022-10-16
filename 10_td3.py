@@ -1,4 +1,4 @@
-"""13.4节TD3算法实现。
+"""10.4节TD3算法实现。
 """
 import argparse
 from collections import defaultdict

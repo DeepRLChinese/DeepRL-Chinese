@@ -1,4 +1,4 @@
-"""8.3节多步SARSA算法实现。
+"""5.3节多步SARSA算法实现。
 """
 import argparse
 import os
