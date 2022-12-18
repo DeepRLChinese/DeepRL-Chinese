@@ -79,13 +79,9 @@ class REINFORCE_with_Baseline:
         r_lst.reverse()
         batch_r = torch.tensor(r_lst)
 
-        # 计算policy loss。
-        with torch.no_grad():
-            advantage = self.V(bs).squeeze() - batch_r
-
         policy_loss = 0
         for i, logp_a in enumerate(blogp_a):
-            policy_loss += logp_a * advantage[i]
+            policy_loss += -logp_a * batch_r[i]
         policy_loss = policy_loss.mean()
         return policy_loss
 

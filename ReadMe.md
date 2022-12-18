@@ -11,6 +11,11 @@ python -u 04_dqn.py --do_train --output_dir output 2>&1 | tee output/log.txt
 - 离散环境：CartPole，https://www.gymlibrary.dev/environments/classic_control/cart_pole/.
 - 连续环境：Pendulum，https://www.gymlibrary.dev/environments/classic_control/pendulum/.
 
+测试环境是python3.7，依赖安装：
+```bash
+pip install -r requirements.txt 
+```
+
 
 # 算法列表
 | 章节                                  | 算法                                                                                                             |

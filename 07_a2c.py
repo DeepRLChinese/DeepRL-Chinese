@@ -1,4 +1,4 @@
-"""8.3节带基线的REINFORCE算法实现。"""
+"""8.3节A2C算法实现。"""
 import argparse
 import os
 from collections import defaultdict
@@ -40,7 +40,7 @@ class PolicyNet(nn.Module):
         return prob
 
 
-class REINFORCE_with_Baseline:
+class A2C:
     def __init__(self, args):
         self.args = args
         self.V = ValueNet(args.dim_state)
@@ -56,36 +56,22 @@ class REINFORCE_with_Baseline:
         return action, logp_action
 
     def compute_value_loss(self, bs, blogp_a, br, bd, bns):
-        # 累积奖励。
-        r_lst = []
-        R = 0
-        for i in reversed(range(len(br))):
-            R = self.args.discount * R + br[i]
-            r_lst.append(R)
-        r_lst.reverse()
-        batch_r = torch.tensor(r_lst)
+        # 目标价值。
+        with torch.no_grad():
+            target_value = br + self.args.discount * torch.logical_not(bd) * self.V_target(bns).squeeze()
 
         # 计算value loss。
-        value_loss = F.mse_loss(self.V(bs).squeeze(), batch_r)
+        value_loss = F.mse_loss(self.V(bs).squeeze(), target_value)
         return value_loss
 
     def compute_policy_loss(self, bs, blogp_a, br, bd, bns):
-        # 累积奖励。
-        r_lst = []
-        R = 0
-        for i in reversed(range(len(br))):
-            R = self.args.discount * R + br[i]
-            r_lst.append(R)
-        r_lst.reverse()
-        batch_r = torch.tensor(r_lst)
-
-        # 计算policy loss。
+        # 建议对比08_a2c.py，比较二者的差异。
         with torch.no_grad():
-            advantage = self.V(bs).squeeze() - batch_r
+            value = self.V(bs).squeeze()
 
         policy_loss = 0
         for i, logp_a in enumerate(blogp_a):
-            policy_loss += logp_a * advantage[i]
+            policy_loss += -logp_a * value[i]
         policy_loss = policy_loss.mean()
         return policy_loss
 
@@ -118,7 +104,7 @@ class Rollout:
         bs = torch.as_tensor(self.state_lst).float()
         ba = torch.as_tensor(self.action_lst).float()
         blogp_a = self.logp_action_lst
-        br = self.reward_lst
+        br = torch.as_tensor(self.reward_lst).float()
         bd = torch.as_tensor(self.done_lst)
         bns = torch.as_tensor(self.next_state_lst).float()
         return bs, ba, blogp_a, br, bd, bns
@@ -149,9 +135,9 @@ class INFO:
             self.episode_reward += reward
 
 
-def train(args, env, agent: REINFORCE_with_Baseline):
-    V_optimizer = torch.optim.Adam(agent.V.parameters(), lr=args.lr)
-    pi_optimizer = torch.optim.Adam(agent.pi.parameters(), lr=args.lr)
+def train(args, env, agent: A2C):
+    V_optimizer = torch.optim.Adam(agent.V.parameters(), lr=3e-3)
+    pi_optimizer = torch.optim.Adam(agent.pi.parameters(), lr=3e-3)
     info = INFO()
 
     rollout = Rollout()
@@ -218,7 +204,7 @@ def train(args, env, agent: REINFORCE_with_Baseline):
 
 
 def eval(args, env, agent):
-    agent = REINFORCE_with_Baseline(args)
+    agent = A2C(args)
     model_path = os.path.join(args.output_dir, "model.bin")
     agent.pi.load_state_dict(torch.load(model_path))
 
@@ -234,7 +220,7 @@ def eval(args, env, agent):
 
         state = next_state
         if done is True:
-            print(f"episode reward={episode_reward}, episode length={episode_length}")
+            print(f"episode reward={episode_reward}, length={episode_length}")
             state, _ = env.reset()
             episode_length = 0
             episode_reward = 0
@@ -250,7 +236,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--max_steps", default=100_000, type=int, help="Maximum steps for interaction.")
     parser.add_argument("--discount", default=0.99, type=float, help="Discount coefficient.")
-    parser.add_argument("--lr", default=3e-3, type=float, help="Learning rate.")
+    parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate.")
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
     parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
 
@@ -259,7 +245,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     env = gym.make(args.env)
-    agent = REINFORCE_with_Baseline(args)
+    agent = A2C(args)
 
     if args.do_train:
         train(args, env, agent)
