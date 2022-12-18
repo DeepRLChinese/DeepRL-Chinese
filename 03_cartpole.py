@@ -5,7 +5,7 @@
 import gym
 
 
-env = gym.make("CartPole-v0")
+env = gym.make("CartPole-v0", render_mode="human")
 state = env.reset()
 
 
@@ -15,9 +15,9 @@ for t in range(1000):
 
     action = env.action_space.sample()
 
-    state, reward, done, info = env.step(action)
+    state, reward, terminated, truncated, info = env.step(action)
 
-    if done:
+    if terminated or truncated:
         print("Finished")
         state = env.reset()
 

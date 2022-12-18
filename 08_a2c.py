@@ -222,7 +222,7 @@ def eval(args, env, agent):
 
         state = next_state
         if done is True:
-            print(f"{episode_reward=}, {episode_length=}")
+            print(f"episode reward={episode_reward}, length={episode_length}")
             state = env.reset()
             episode_length = 0
             episode_reward = 0

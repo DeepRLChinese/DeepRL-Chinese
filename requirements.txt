@@ -1,0 +1,5 @@
+gym==0.26.2
+matplotlib==3.5.3
+numpy==1.21.6
+PettingZoo==1.22.2
+torch==1.13.0

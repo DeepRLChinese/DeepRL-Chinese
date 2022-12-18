@@ -121,14 +121,15 @@ def train(args, env, agent):
     log["loss"].append(0)
 
     agent.Q.train()
-    state = env.reset()
+    state, _ = env.reset(seed=args.seed)
     for i in range(args.max_steps):
         if np.random.rand() < epsilon or i < args.warmup_steps:
             action = env.action_space.sample()
         else:
             action = agent.get_action(torch.from_numpy(state))
             action = action.item()
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
         episode_reward += reward
         episode_length += 1
 
@@ -139,7 +140,7 @@ def train(args, env, agent):
             log["episode_reward"].append(episode_reward)
             log["episode_length"].append(episode_length)
 
-            print(f"{i=}, reward={episode_reward:.0f}, length={episode_length}, max_reward={max_episode_reward}, loss={log['loss'][-1]:.1e}, {epsilon=:.3f}")
+            print(f"i={i}, reward={episode_reward:.0f}, length={episode_length}, max_reward={max_episode_reward}, loss={log['loss'][-1]:.1e}, epsilon={epsilon:.3f}")
 
             # 如果得分更高，保存模型。
             if episode_reward > max_episode_reward:
@@ -150,7 +151,7 @@ def train(args, env, agent):
             episode_reward = 0
             episode_length = 0
             epsilon = max(epsilon - (epsilon_max - epsilon_min) * args.epsilon_decay, 1e-1)
-            state = env.reset()
+            state, _ = env.reset()
 
         if i > args.warmup_steps:
             bs, ba, br, bd, bns = replay_buffer.sample(n=args.batch_size)
@@ -187,18 +188,19 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state = env.reset()
+    state, _ = env.reset()
     for i in range(5000):
         episode_length += 1
         action = agent.get_action(torch.from_numpy(state)).item()
-        next_state, reward, done, info = env.step(action)
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
         env.render()
         episode_reward += reward
 
         state = next_state
         if done is True:
-            print(f"{episode_reward=}, {episode_length=}")
-            state = env.reset()
+            print(f"episode reward={episode_reward}, episode length{episode_length}")
+            state, _ = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -224,7 +226,6 @@ def main():
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     env = gym.make(args.env)
-    env.seed(args.seed)
     set_seed(args)
     agent = DQN(dim_state=args.dim_state, num_action=args.num_action, discount=args.discount)
     agent.Q.to(args.device)

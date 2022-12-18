@@ -4,10 +4,9 @@ __pycache__/
 .ipynb_checkpoints/
 mnist_data/
 
-*.sh
 *.ipynb 
-
-
+*.png 
+*.sh
 
 tests/
 test*.py
