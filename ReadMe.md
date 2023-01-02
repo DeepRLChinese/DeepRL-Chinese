@@ -16,6 +16,7 @@ python -u 04_dqn.py --do_train --output_dir output 2>&1 | tee output/log.txt
 pip install -r requirements.txt 
 ```
 
+所有代码均用于教学，可在笔记本CPU环境下训练。
 
 # 算法列表
 | 章节                                  | 算法                                                                                                             |
@@ -34,7 +35,7 @@ pip install -r requirements.txt
 | 12 模仿学习                           | GAIL                                                                                                             |
 | 13 并行计算                           | A3C                                                                                                              |
 | 14 多智能体系统                       | MPE                                                                                                              |
-| 15 合作关系设定下的多智能体强化学习   |                                                                                                                  |
+| 15 合作关系设定下的多智能体强化学习   | MAC-A2C                                                                                                          |
 | 16 非合作关系设定下的多智能体强化学习 |                                                                                                                  |
 | 17 注意力机制与多智能体强化学习       |                                                                                                                  |
 | 18 AlphaGo 与蒙特卡洛树搜索           | [AlphaZero](https://github.com/suragnair/alpha-zero-general)                                                     |

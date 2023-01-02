@@ -178,7 +178,7 @@ def train(args, env, agent: TD3):
     replay_buffer = ReplayBuffer(maxsize=100_000)
     info = INFO()
 
-    state = env.reset()
+    state, _ = env.reset(seed=args.seed)
     for step in range(args.max_steps):
         if step < args.warmup_steps:
             action = env.action_space.sample()
@@ -188,7 +188,8 @@ def train(args, env, agent: TD3):
             action_noise = np.clip(np.random.randn(args.dim_action), -args.max_action, args.max_action)
             action = np.clip(action + action_noise, -args.max_action, args.max_action)
 
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
         replay_buffer.push(state, action, reward, done, next_state)
         state = next_state
         info.put(done, reward)
@@ -197,18 +198,25 @@ def train(args, env, agent: TD3):
             # 打印信息。
             episode_reward = info.log["episode_reward"][-1]
             episode_length = info.log["episode_length"][-1]
-            value_loss = info.log["value_loss"][-1] if len(info.log["value_loss"]) > 0 else 0
-            print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.1e}")
+            value_loss = info.log["value_loss1"][-1] if len(info.log["value_loss1"]) > 0 else 0
+            print(f"step={step}, reward={episode_reward:.0f}, length={episode_length}, max_reward={info.max_episode_reward}, value_loss={value_loss:.2f}")
 
             # 如果得分更高，保存模型。
             if episode_reward == info.max_episode_reward:
                 save_path = os.path.join(args.output_dir, "model.bin")
                 torch.save(agent.Mu.state_dict(), save_path)
 
-            state = env.reset()
+            state, _ = env.reset()
 
         if step > args.warmup_steps:
             s_batch, a_batch, r_batch, d_batch, ns_batch = replay_buffer.sample(n=args.batch_size)
+
+            s_batch = np.array(s_batch)
+            a_batch = np.array(a_batch)
+            r_batch = np.array(r_batch)
+            d_batch = np.array(d_batch)
+            ns_batch = np.array(ns_batch)
+
             s_batch = torch.tensor(s_batch, dtype=torch.float32)
             a_batch = torch.tensor(a_batch, dtype=torch.float32)
             r_batch = torch.tensor(r_batch, dtype=torch.float32)
@@ -257,18 +265,19 @@ def eval(args, env, agent):
 
     episode_length = 0
     episode_reward = 0
-    state = env.reset()
+    state, _ = env.reset()
     for i in range(5000):
         episode_length += 1
         action = agent.get_action(torch.from_numpy(state)).cpu().data.numpy()
-        next_state, reward, done, info = env.step(action)
+        next_state, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         env.render()
         episode_reward += reward
 
         state = next_state
         if done is True:
             print(f"episode reward={episode_reward}, length={episode_length}")
-            state = env.reset()
+            state, _ = env.reset()
             episode_length = 0
             episode_reward = 0
 
@@ -282,20 +291,10 @@ def main():
     parser.add_argument("--gamma", default=0.99, type=float, help="Discount coefficient.")
 
     parser.add_argument("--max_steps", default=100_000, type=int, help="Maximum steps for interaction.")
-    parser.add_argument(
-        "--warmup_steps",
-        default=10_000,
-        type=int,
-        help="Warmup steps without training.",
-    )
+    parser.add_argument("--warmup_steps", default=10_000, type=int, help="Warmup steps without training.")
     parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate.")
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-    parser.add_argument(
-        "--K",
-        default=2,
-        type=int,
-        help="Delay K steps to update policy and target network.",
-    )
+    parser.add_argument("--K", default=2, type=int, help="Delay K steps to update policy and target network.")
     parser.add_argument("--policy_noise", default=0.2, type=float, help="Policy noise.")
     parser.add_argument("--noise_clip", default=0.5, type=float, help="Policy noise.")
 
@@ -310,7 +309,6 @@ def main():
 
     # 初始化环境。
     env = gym.make(args.env)
-    env.seed(args.seed)
 
     agent = TD3(dim_state=args.dim_state, dim_action=args.dim_action, max_action=args.max_action)
 

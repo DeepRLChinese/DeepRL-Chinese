@@ -223,7 +223,7 @@ def train(args, env, agent: DDPG):
 
             if i > args.warm_steps:
 
-                for _ in range(50):
+                for _ in range(20):
                     bs, ba, br, bd, bns = replay_buffer.sample_batch(args.batch_size)
 
                     value_loss = agent.compute_value_loss(bs, ba, br, bd, bns)
@@ -282,7 +282,7 @@ def eval(args, agent: DDPG):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="Pendulum-v1", type=str, help="gym environment")
-    parser.add_argument("--max_steps", default=50_000, type=int)
+    parser.add_argument("--max_steps", default=100_000, type=int)
     parser.add_argument("--warm_steps", default=1_000, type=int)
 
     parser.add_argument("--gamma", default=0.95, type=float, help="discount")
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr_value", default=1e-3, type=float)
 
     parser.add_argument("--tau", default=0.001, type=float, help="target network update coefficient")
-    parser.add_argument("--buffer_size", default=1000_000, type=int, help="replay buff size")
+    parser.add_argument("--buffer_size", default=100_000, type=int, help="replay buff size")
     parser.add_argument("--output_dir", default="output", type=str, help="result output dir")
     parser.add_argument("--model_path", type=str, help="if test mode, import the model")
 
