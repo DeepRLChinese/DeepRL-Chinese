@@ -36,8 +36,6 @@ class DQN:
     def __init__(self, dim_state=None, num_action=None, discount=0.9):
         self.discount = discount
         self.Q = QNet(dim_state, num_action)
-        self.target_Q = QNet(dim_state, num_action)
-        self.target_Q.load_state_dict(self.Q.state_dict())
 
     def get_action(self, state):
         qvals = self.Q(state)
@@ -46,19 +44,11 @@ class DQN:
     def compute_loss(self, s_batch, a_batch, r_batch, d_batch, next_s_batch):
         # 计算s_batch，a_batch对应的值。
         qvals = self.Q(s_batch).gather(1, a_batch.unsqueeze(1)).squeeze()
-        # 使用target Q网络计算next_s_batch对应的值。
-        next_qvals, _ = self.target_Q(next_s_batch).detach().max(dim=1)
+        # 使用原始的 Q网络计算next_s_batch对应的值。
+        next_qvals, _ = self.Q(next_s_batch).detach().max(dim=1)
         # 使用MSE计算loss。
         loss = F.mse_loss(r_batch + self.discount * next_qvals * (1 - d_batch), qvals)
         return loss
-
-
-def soft_update(target, source, tau=0.01):
-    """
-    update target by target = tau * source + (1 - tau) * target.
-    """
-    for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
 @dataclass
@@ -106,7 +96,7 @@ def set_seed(args):
         torch.cuda.manual_seed(args.seed)
 
 
-def train(args, env, agent):
+def train(args, env, agent, device):
     replay_buffer = ReplayBuffer(10_000)
     optimizer = torch.optim.Adam(agent.Q.parameters(), lr=args.lr)
     optimizer.zero_grad()
@@ -126,7 +116,7 @@ def train(args, env, agent):
         if np.random.rand() < epsilon or i < args.warmup_steps:
             action = env.action_space.sample()
         else:
-            action = agent.get_action(torch.from_numpy(state))
+            action = agent.get_action(torch.from_numpy(state).to(device))
             action = action.item()
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
@@ -155,11 +145,11 @@ def train(args, env, agent):
 
         if i > args.warmup_steps:
             bs, ba, br, bd, bns = replay_buffer.sample(n=args.batch_size)
-            bs = torch.tensor(bs, dtype=torch.float32)
-            ba = torch.tensor(ba, dtype=torch.long)
-            br = torch.tensor(br, dtype=torch.float32)
-            bd = torch.tensor(bd, dtype=torch.float32)
-            bns = torch.tensor(bns, dtype=torch.float32)
+            bs = torch.tensor(bs, dtype=torch.float32).to(device)
+            ba = torch.tensor(ba, dtype=torch.long).to(device)
+            br = torch.tensor(br, dtype=torch.float32).to(device)
+            bd = torch.tensor(bd, dtype=torch.float32).to(device)
+            bns = torch.tensor(bns, dtype=torch.float32).to(device)
 
             loss = agent.compute_loss(bs, ba, br, bd, bns)
             loss.backward()
@@ -167,8 +157,6 @@ def train(args, env, agent):
             optimizer.zero_grad()
 
             log["loss"].append(loss.item())
-
-            soft_update(agent.target_Q, agent.Q)
 
     # 3. 画图。
     plt.plot(log["loss"])
@@ -181,7 +169,7 @@ def train(args, env, agent):
     plt.close()
 
 
-def eval(args, env, agent):
+def eval(args, env, agent, device):
     agent = DQN(args.dim_state, args.num_action)
     model_path = os.path.join(args.output_dir, "model.bin")
     agent.Q.load_state_dict(torch.load(model_path))
@@ -191,7 +179,7 @@ def eval(args, env, agent):
     state, _ = env.reset()
     for i in range(5000):
         episode_length += 1
-        action = agent.get_action(torch.from_numpy(state)).item()
+        action = agent.get_action(torch.from_numpy(state).to(device)).item()
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
         env.render()
@@ -229,13 +217,12 @@ def main():
     set_seed(args)
     agent = DQN(dim_state=args.dim_state, num_action=args.num_action, discount=args.discount)
     agent.Q.to(args.device)
-    agent.target_Q.to(args.device)
 
     if args.do_train:
-        train(args, env, agent)
+        train(args, env, agent, args.device)
 
     if args.do_eval:
-        eval(args, env, agent)
+        eval(args, env, agent, args.device)
 
 
 if __name__ == "__main__":
