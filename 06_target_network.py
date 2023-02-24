@@ -32,7 +32,7 @@ class QNet(nn.Module):
         return x
 
 
-class DQN:
+class TargetDQN:
     def __init__(self, dim_state=None, num_action=None, discount=0.9):
         self.discount = discount
         self.Q = QNet(dim_state, num_action)
@@ -182,7 +182,7 @@ def train(args, env, agent, device):
 
 
 def eval(args, env, agent, device):
-    agent = DQN(args.dim_state, args.num_action)
+    agent = TargetDQN(args.dim_state, args.num_action)
     model_path = os.path.join(args.output_dir, "model.bin")
     agent.Q.load_state_dict(torch.load(model_path))
 
@@ -227,7 +227,7 @@ def main():
 
     env = gym.make(args.env)
     set_seed(args)
-    agent = DQN(dim_state=args.dim_state, num_action=args.num_action, discount=args.discount)
+    agent = TargetDQN(dim_state=args.dim_state, num_action=args.num_action, discount=args.discount)
     agent.Q.to(args.device)
     agent.target_Q.to(args.device)
 
