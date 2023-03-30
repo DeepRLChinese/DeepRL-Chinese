@@ -8,7 +8,7 @@ import random
 from dataclasses import dataclass, field
 import gym
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as npf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -124,7 +124,7 @@ def set_seed(args):
         torch.cuda.manual_seed(args.seed)
 
 
-def train(args, env, agent, device):
+def train(args, env, agent):
     replay_buffer = ReplayBuffer(10_000)
     optimizer = torch.optim.Adam(chain(agent.V.parameters(), agent.D.parameters()), lr=args.lr)
     optimizer.zero_grad()
@@ -145,7 +145,7 @@ def train(args, env, agent, device):
         if np.random.rand() < epsilon or i < args.warmup_steps:
             action = env.action_space.sample()
         else:
-            action = agent.get_action(torch.from_numpy(state).to(device))
+            action = agent.get_action(torch.from_numpy(state).to(args.device))
             action = action.item()
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
@@ -176,11 +176,11 @@ def train(args, env, agent, device):
 
         if i > args.warmup_steps:
             bs, ba, br, bd, bns = replay_buffer.sample(n=args.batch_size)
-            bs = torch.tensor(bs, dtype=torch.float32).to(device)
-            ba = torch.tensor(ba, dtype=torch.long).to(device)
-            br = torch.tensor(br, dtype=torch.float32).to(device)
-            bd = torch.tensor(bd, dtype=torch.float32).to(device)
-            bns = torch.tensor(bns, dtype=torch.float32).to(device)
+            bs = torch.tensor(bs, dtype=torch.float32).to(args.device)
+            ba = torch.tensor(ba, dtype=torch.long).to(args.device)
+            br = torch.tensor(br, dtype=torch.float32).to(args.device)
+            bd = torch.tensor(bd, dtype=torch.float32).to(args.device)
+            bns = torch.tensor(bns, dtype=torch.float32).to(args.device)
 
             loss = agent.compute_loss(bs, ba, br, bd, bns)
             loss.backward()
@@ -200,7 +200,7 @@ def train(args, env, agent, device):
     plt.close()
 
 
-def eval(args, env, agent, device):
+def eval(args, env, agent):
     agent = DeulingNetwork(args.dim_state, args.num_action)
     v_model_path = os.path.join(args.output_dir, "V_model.bin")
     agent.V.load_state_dict(torch.load(v_model_path))
@@ -213,7 +213,7 @@ def eval(args, env, agent, device):
     state, _ = env.reset()
     for i in range(5000):
         episode_length += 1
-        action = agent.get_action(torch.from_numpy(state).to(device)).item()
+        action = agent.get_action(torch.from_numpy(state).to(args.device)).item()
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
         env.render()
@@ -254,10 +254,10 @@ def main():
     agent.D.to(args.device)
 
     if args.do_train:
-        train(args, env, agent, args.device)
+        train(args, env, agent)
 
     if args.do_eval:
-        eval(args, env, agent, args.device)
+        eval(args, env, agent)
 
 
 if __name__ == "__main__":
